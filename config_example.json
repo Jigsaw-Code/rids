@@ -1,0 +1,9 @@
+{
+  "ioc_sources": [
+    {
+      "name": "EmergingThreats compromised IP addresses",
+      "url": "https://rules.emergingthreats.net/open/suricata-5.0/rules/compromised-ips.txt",
+      "format": "BADIP4_NEWLINES"
+    }
+  ]
+}

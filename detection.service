@@ -1,0 +1,12 @@
+[Unit]
+Description=unusual TLS connection detection with tshark
+
+[Service]
+User=root
+WorkingDirectory=/usr/local/sbin
+ExecStart=/usr/local/sbin/detect.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

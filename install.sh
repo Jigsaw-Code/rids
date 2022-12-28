@@ -34,6 +34,10 @@ cp packet_filter.py /usr/local/sbin
 cp rids.py /usr/local/sbin
 
 # move sysctl .service config to /etc/systemd and start service
+if [[ $(systemctl list-units --all --full -t service --no-legend "detection.service" | sed 's/^s*//g' | cut -f1 -d' ') == "detection.service" ]]; then
+  systemctl stop detection.service
+fi
+
 cp detection.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl start detection.service

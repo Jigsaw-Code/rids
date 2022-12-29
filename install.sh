@@ -36,12 +36,11 @@ cp rids.py /usr/local/sbin
 # Define sysctl .service config to /etc/systemd and start service
 
 # first, stop the service if it exists and is running
-systemctl stop rids_detection.service >& /dev/null
+systemctl stop rids.service >& /dev/null
 
-cp rids_detection.service /etc/systemd/system/
+cp rids.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl start rids_detection.service
-systemctl enable rids_detection.service
+systemctl enable rids.service --now
 
 # return to previous directory
 popd

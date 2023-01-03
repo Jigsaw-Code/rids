@@ -3,7 +3,27 @@
     {
       "name": "EmergingThreats compromised IP addresses",
       "url": "https://rules.emergingthreats.net/open/suricata-5.0/rules/compromised-ips.txt",
-      "format": "BADIP4_NEWLINES"
+      "format": "BAD_IP_LIST"
+    },
+    {
+      "name": "3CORESec Poor Reputation IPs",
+      "url": "https://blacklist.3coresec.net/lists/et-open.txt",
+      "format": "BAD_IP_LIST"
+    },
+    {
+      "name": "CINSscore badguys list - cinsscore.com",
+      "url": "https://cinsscore.com/list/ci-badguys.txt",
+      "format": "BAD_IP_LIST"
+    },
+    {
+      "name": "blocklist.de suspicious IPs",
+      "url": "https://lists.blocklist.de/lists/all.txt",
+      "format": "BAD_IP_LIST"
+    },
+    {
+      "name": "TOR exit nodes (dan.me.uk)",
+      "url": "https://www.dan.me.uk/torlist/?exit",
+      "format": "BAD_IP_LIST"
     }
   ]
 }

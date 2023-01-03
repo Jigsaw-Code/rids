@@ -1,5 +1,5 @@
 [Unit]
-Description=unusual TLS connection detection with tshark
+Description=Remote Intrusion Detection System daemon
 
 [Service]
 User=root

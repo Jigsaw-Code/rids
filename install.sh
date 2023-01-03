@@ -33,11 +33,14 @@ chmod +x /usr/local/sbin/detect.sh
 cp packet_filter.py /usr/local/sbin
 cp rids.py /usr/local/sbin
 
-# move sysctl .service config to /etc/systemd and start service
-cp detection.service /etc/systemd/system/
+# Define sysctl .service config to /etc/systemd and start service
+
+# first, stop the service if it exists and is running
+systemctl stop rids.service >& /dev/null
+
+cp rids.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl start detection.service
-systemctl enable detection.service
+systemctl enable rids.service --now
 
 # return to previous directory
 popd

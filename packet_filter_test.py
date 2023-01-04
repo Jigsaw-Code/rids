@@ -31,11 +31,6 @@ def badips_map():
     '100.12.34.56': 'Threatbusters',
   }
 
-class MockLogging:
-  logged = False
-  def info(*args):
-    logged = True
-
 
 def test_good_ip_is_ok(badips_map):
   detected = packet_filter.detect_bad_ips('0\t127.0.0.1\t1.2.3.4', badips_map)

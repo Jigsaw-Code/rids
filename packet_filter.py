@@ -64,15 +64,21 @@ def detect_tls_events(input_stream):
 
 
 def warn_about_ip_address(ip_address, bad_ips):
-    if ip_address in bad_ips:
-        ioc_source = bad_ips[ip_address]
-        logging.info('CONNECTING WITH BAD IP %s (found in %s)',
-                     ip_address, ioc_source)
+  ip_address = str(ip_address)
+  if ip_address in bad_ips:
+    ioc_sources = bad_ips[ip_address]
+    logging.info('CONNECTING WITH BAD IP %s (found in %s)',
+                 ip_address, ioc_sources)
+    return True
+  return False
  
 
-def detect_bad_ips(input_stream, bad_ips):
-    for line in iter(input_stream, b''):
-        values = line.split('\t')
-        ip_from, ip_to = ipaddress.ip_address(values[1]), ipaddress.ip_address(values[2])
-        check_ip_address(ip_from, bad_ips)
-        check_ip_address(ip_to, bad_ips)
+def detect_bad_ips(dataline, bad_ips):
+  if not dataline:
+    return False
+  values = dataline.split('\t')
+  ip_from, ip_to = ipaddress.ip_address(values[1]), ipaddress.ip_address(values[2])
+  if (warn_about_ip_address(ip_from, bad_ips)
+      or warn_about_ip_address(ip_to, bad_ips)):
+    return True
+  return False

@@ -30,7 +30,7 @@ import urllib.request
 from absl import app
 from absl import flags
 
-import packet_filter
+import network_capture
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('host_ip', None,
@@ -101,7 +101,7 @@ def main(argv):
       stdout=subprocess.PIPE,
       stderr=subprocess.PIPE,
       universal_newlines=True)
-  packet_filter.detect_tls_events(oddtls_capture.stdout.readline)
+  network_capture.detect_tls_events(oddtls_capture.stdout.readline)
 
   bad_ips = retrieve_bad_ips()
   ip_capture = subprocess.Popen([
@@ -120,7 +120,7 @@ def main(argv):
   # TODO define a class in packet_filter instead of using a function
   # filter = packet_filter.Filter(); filter.add_bad_ips(bad_ips); ...
   for line in iter(ip_capture.stdout.readline, b''):
-    packet_filter.detect_bad_ips(line, bad_ips)
+    network_capture.detect_bad_ips(line, bad_ips)
 
 
 if __name__ == '__main__':

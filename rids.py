@@ -48,12 +48,15 @@ def retrieve_bad_ips():
       with urllib.request.urlopen(source['url']) as ioc_data:
         # TODO check format of ioc source, branch to different parsers
         # For now, the only source format is newline-seprated bad IPv4 addresses
+        # TODO perform parsing in a separate function from config handling
         for line in ioc_data.readlines():
           line = line.strip().decode('utf-8')
           if not line: continue
-          bad_ip = ipaddress.ip_address(line)
-          # TODO we need to handle the possibility that an IPaddr appears in more than one list
-          bad_ips[bad_ip] = source['name']
+          bad_ip = str(ipaddress.ip_address(line))
+          if bad_ip not in bad_ips:
+            bad_ips[bad_ip] = [source['name']]
+          else:
+            bad_ips[bad_ip].append(source['name'])
   return bad_ips
 
 
@@ -116,7 +119,8 @@ def main(argv):
 
   # TODO define a class in packet_filter instead of using a function
   # filter = packet_filter.Filter(); filter.add_bad_ips(bad_ips); ...
-  packet_filter.detect_bad_ips(ip_capture.stdout.readline, bad_ips)
+  for line in iter(ip_capture.stdout.readline, b''):
+    packet_filter.detect_bad_ips(line, bad_ips)
 
 
 if __name__ == '__main__':

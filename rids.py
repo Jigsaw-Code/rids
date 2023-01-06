@@ -48,6 +48,7 @@ def retrieve_bad_ips():
       with urllib.request.urlopen(source['url']) as ioc_data:
         # TODO check format of ioc source, branch to different parsers
         # For now, the only source format is newline-seprated bad IPv4 addresses
+        # TODO perform parsing in a separate function from config handling
         for line in ioc_data.readlines():
           line = line.strip().decode('utf-8')
           if not line: continue

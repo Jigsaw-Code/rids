@@ -24,6 +24,8 @@ allowed_sni_port = set([
 ])
 
 
+# TODO: decouple detection and logging
+
 def detect_tls_events(input_stream):
     unusual_tls_traffic = {}  # map[int]dict stream_id -> connection_details
 

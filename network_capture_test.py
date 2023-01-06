@@ -13,13 +13,13 @@
 # limitations under the License.
 
 """
-Tests for the packet_filter library.
+Tests for the network_capture library.
 """
 
 
 import io
 
-import packet_filter
+import network_capture
 import pytest
 
 
@@ -33,10 +33,10 @@ def badips_map():
 
 
 def test_good_ip_is_ok(badips_map):
-  detected = packet_filter.detect_bad_ips('0\t127.0.0.1\t1.2.3.4', badips_map)
+  detected = network_capture.detect_bad_ips('0\t127.0.0.1\t1.2.3.4', badips_map)
   assert not detected
 
 
 def test_bad_ip_is_logged(badips_map):
-  detected = packet_filter.detect_bad_ips('1\t4.5.6.7\t127.0.0.1', badips_map)
+  detected = network_capture.detect_bad_ips('1\t4.5.6.7\t127.0.0.1', badips_map)
   assert detected

@@ -20,12 +20,6 @@ Main entry point for RIDS, a Remote Intrusion Detection System.
 """
 
 
-
-"""
-Main entry point for RIDS, a Remote Intrusion Detection System.
-"""
-
-
 import ipaddress
 import json
 import os

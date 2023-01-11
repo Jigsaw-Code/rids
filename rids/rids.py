@@ -19,98 +19,114 @@
 Main entry point for RIDS, a Remote Intrusion Detection System.
 """
 
+
+
+"""
+Main entry point for RIDS, a Remote Intrusion Detection System.
+"""
+
+
 import ipaddress
 import json
-import logging
-import threading
-import urllib
-import queue
+import os
+import subprocess
+import sys
+import urllib.request
 
 from absl import app
 from absl import flags
 
-from rids import config
 from rids import network_capture
-from rids.iocs import iocs
-from rids import rules
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('host_ip', None,
                     'The IP of the host process, for ignoring direct requests')
-flags.DEFINE_string('config_path', '/etc/rids/config.json',
-                    'file path indicating where IOC configuration can be found')
-flags.DEFINE_string('eventlog_path', '/var/rids/events.log',
-                    'file path indicating where to append new event logs')
+flags.DEFINE_string('config_path', 'config.json',
+                    'Path where IOC configuration can be found; uses config.json by default')
+
+
+def retrieve_bad_ips():
+  bad_ips = {}
+  with open(FLAGS.config_path, 'r') as f:
+    config = json.load(f)
+    for source in config['ioc_sources']:
+      # Download a fresh version of each IOC source in the config.
+      with urllib.request.urlopen(source['url']) as ioc_data:
+        # TODO check format of ioc source, branch to different parsers
+        # For now, the only source format is newline-seprated bad IPv4 addresses
+        # TODO perform parsing in a separate function from config handling
+        for line in ioc_data.readlines():
+          line = line.strip().decode('utf-8')
+          if not line: continue
+          bad_ip = str(ipaddress.ip_address(line))
+          if bad_ip not in bad_ips:
+            bad_ips[bad_ip] = [source['name']]
+          else:
+            bad_ips[bad_ip].append(source['name'])
+  return bad_ips
+
+
+def get_external_ip():
+  with urllib.request.urlopen('https://ipinfo.io/ip') as my_ip:
+    return my_ip.read().decode("utf-8").strip()
 
 
 def main(argv):
-  """Main entry point of the app.  Also bound to CLI `rids` by setuptools."""
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
 
-  host_ip = _get_host_ip()
-  print('Using', host_ip, 'as host IP address')
-
-  config = config.ParseFile(FLAGS.config)
-  logging.basicConfig(level=logging.DEBUG,
-                      format='%(asctime)s %(levelname)-8s %(message)s',
-                      datefmt='%m-%d %H:%M',
-                      filename='/var/rids.log',
-                      filemode='a')
-
-  ruleset = rules.RuleSet()
-  for ioc_config in config['iocs']:
-    ruleset.MergeRuleset(iocs.parse_ruleset(ioc_config))
-
-  event_queue = queue.Queue()
-  threading.Thread(
-      target=_inspect_tls_traffic,
-      args=(host_ip, ruleset, event_queue))
-  threading.Thread(
-      target=_inspect_remote_endpoint,
-      args=(host_ip, ruleset, event_queue))
-
-  while True:
-    # We just log the events for now, here is where we could do post-processing
-    event = event_queue.get()
-    logging.log(json.puts(event))
-
-
-def _inspect_tls_traffic(host_ip, ruleset, q):
-  """Worker function for thread that inspects client and server hellos.
-  
-  Args:
-    ruleset: a RuleSet object to perform evaluation with
-    q: a Queue for relaying events back to the main thread
-  """
-  tls_capture = network_capture.HandshakeScanner(host_ip)
-  for client_hello, server_hello in tls_capture.scan():
-    events = rules.process_handshake(client_hello, server_hello)
-    for event in events:
-      q.put(event)
-
-
-def _inspect_remote_endpoint(host_ip, ruleset, q):
-  """Worker function for thread that inspects remote IP addresses.
-
-  Args:
-    ruleset: a RuleSet object to perform evaluation with
-    q: a Queue for relaying events back to the main thread
-  """
-  remote_ip_capture = network_capture.RemoteServerSanner(host_ip)
-  for connection in remote_ip_capture.scan():
-    events = rules.process_endpoint(connection)
-    for event in events:
-      q.put(event)
-
-
-def _get_host_ip():
   host_ip = FLAGS.host_ip
   if not FLAGS.host_ip:
-    with urllib.request.urlopen('https://ipinfo.io/ip') as my_ip:
-      host_ip = my_ip.read().decode("utf-8").strip()
+    host_ip = get_external_ip()
   host_ip = ipaddress.ip_address(host_ip)
-  return host_ip
+  print('Using', host_ip, 'as host IP address')
+
+  # Spawn tshark and read its output.  This assumes the wireshark-dev/stable
+  # version of tshark has been installed.
+  oddtls_capture = subprocess.Popen([
+      'tshark',
+      '-f', 'tcp and not (src port 443 or dst port 443)',
+      '-Y', (f'(tls.handshake.type == 1 and ip.src == {host_ip})' +
+             f'or (tls.handshake.type == 2 and ip.dst == {host_ip})'),
+      '-Tfields',
+      # The order of the following fields determines the ordering in output
+      '-e', 'frame.time',
+      '-e', 'tcp.stream',
+      '-e', 'tls.handshake.type',
+      '-e', 'ip.src',
+      '-e', 'tcp.srcport',
+      '-e', 'ip.dst',
+      '-e', 'tcp.dstport',
+      '-e', 'tls.handshake.extensions_server_name',
+      '-e', 'tls.handshake.ja3',
+      '-e', 'tls.handshake.ja3_full',
+      '-e', 'tls.handshake.ja3s',
+      '-e', 'tls.handshake.ja3s_full',
+      '-l',
+      ],
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      universal_newlines=True)
+  network_capture.detect_tls_events(oddtls_capture.stdout.readline)
+
+  bad_ips = retrieve_bad_ips()
+  ip_capture = subprocess.Popen([
+      'tshark',
+      '-Tfields',
+      # The order of the following fields determines the ordering in output
+      '-e', 'frame.time',
+      '-e', 'ip.src',
+      '-e', 'ip.dst',
+      '-l',
+      ],
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      universal_newlines=True)
+
+  # TODO define a class in packet_filter instead of using a function
+  # filter = network_capture.Filter(); filter.add_bad_ips(bad_ips); ...
+  for line in iter(ip_capture.stdout.readline, b''):
+    network_capture.detect_bad_ips(line, bad_ips)
 
 
 if __name__ == '__main__':

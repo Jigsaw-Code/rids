@@ -13,80 +13,28 @@
 # limitations under the License.
 
 
-class RemoteServerScanner:
-  """Continuously scans the network traffic for remote IPs being contacted.
-
-  The scan() function is an iterator that produces a dict{...} representing
-  the endpoints (specifically the `remote_ip` and `remote_port` fields).  This
-  scanning will continue until the pipe from the underlying network scanning
-  process is closed.
-  """
-  def __init__(self, host_ip):
-    self._proc = _start_tshark([
-        '-f', 'ip and src ip == {host_ip}',
-        '-Tfields',
-        # The order of the following fields determines the ordering in output
-        '-e', 'frame.time',
-        '-e', 'ip.dst',
-        '-l',
-    ])
-
-  def scan(self):
-    for line in iter(self._proc.stdout.readline, b''):
+import ipaddress
+import logging
 
 
-
-class HandshakeScanner:
-  """Continuously scans the network traffic for TLS handshakes.
-
-  The scan() function is an iterator that produces a tuple of
-    (client_hello, server_hello)
-  where server_hello may be `None` if only the client hello has been seen, and
-  will include both when the server_hello is found.  Each is a dict that has
-  `remote_ip`, `remote_port`, `sni` (if present), `ja3`, `ja3s` as properties.
-  """
-  def __init__(self, host_ip):
-    _start_tshark([
-        '-f', 'tcp and not (src port 443 or dst port 443)',
-        '-Y', (f'(tls.handshake.type == 1 and ip.src == {host_ip})' +
-              f'or (tls.handshake.type == 2 and ip.dst == {host_ip})'),
-        '-Tfields',
-        # Ordering of the following fields determines the ordering in output,
-        # except that missing fields are skipped.
-        '-e', 'frame.time',
-        '-e', 'tcp.stream',
-        '-e', 'tls.handshake.type',
-        '-e', 'ip.src',
-        '-e', 'tcp.srcport',
-        '-e', 'ip.dst',
-        '-e', 'tcp.dstport',
-        '-e', 'tls.handshake.extensions_server_name',
-        '-e', 'tls.handshake.ja3',
-        '-e', 'tls.handshake.ja3_full',
-        '-e', 'tls.handshake.ja3s',
-        '-e', 'tls.handshake.ja3s_full',
-        '-l',
-    ])
-
-  # Ignore these false positives.
-  # TODO: include these in the handshake rules instead of defining them here.
-  _allowed_sni_port = set([
-      ('mtalk.google.com', 5228),
-      ('proxy-safebrowsing.googleapis.com', 80),
-      ('courier.push.apple.com', 5223),
-      ('imap.gmail.com', 993),
-  ])
-
-  def scan():
-    # TODO ...yield
-    pass
+allowed_sni_port = set([
+    ('mtalk.google.com', 5228),
+    ('proxy-safebrowsing.googleapis.com', 80),
+    ('courier.push.apple.com', 5223),
+    ('imap.gmail.com', 993),
+])
 
 
-def _start_tshark(args):
-
+# TODO: decouple detection and logging
 
 def detect_tls_events(input_stream):
     unusual_tls_traffic = {}  # map[int]dict stream_id -> connection_details
+
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s %(levelname)-8s %(message)s',
+                        datefmt='%m-%d %H:%M',
+                        filename='/var/maldetector.log',
+                        filemode='a')
 
     for line in iter(input_stream, b''):
         values = line.split('\t')
@@ -117,7 +65,7 @@ def detect_tls_events(input_stream):
 
             print(line.rstrip())
 
- 
+
 def warn_about_ip_address(ip_address, bad_ips):
   ip_address = str(ip_address)
   if ip_address in bad_ips:

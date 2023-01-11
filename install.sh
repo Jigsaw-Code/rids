@@ -23,15 +23,15 @@ apt --assume-yes install tshark python3-pip
 
 # download repo with scripts
 git clone https://github.com/Jigsaw-Code/rids
-pushd rids/rids
+pushd rids
 
 pip3 install absl-py
 
 # copy wrapper script into a bin/ path
 cp detect.sh /usr/local/sbin
 chmod +x /usr/local/sbin/detect.sh
-cp network_capture.py /usr/local/sbin
-cp rids.py /usr/local/sbin
+cp rids/network_capture.py /usr/local/sbin
+cp rids/rids.py /usr/local/sbin
 
 # Define sysctl .service config to /etc/systemd and start service
 

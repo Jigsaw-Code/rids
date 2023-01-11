@@ -4,7 +4,7 @@ Description=Remote Intrusion Detection System daemon
 [Service]
 User=root
 WorkingDirectory=/usr/local/sbin
-ExecStart=/usr/local/sbin/detect.sh
+ExecStart=/usr/local/sbin/rids.py
 Restart=always
 
 [Install]

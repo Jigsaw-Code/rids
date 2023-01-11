@@ -24,7 +24,7 @@ build-backend = "setuptools.build_meta"
 packages = ["rids"]
 
 [project.scripts]
-rids = "pyrids.rids:main"
+rids = "rids.rids:main"
 
 [project.urls]
 repository = "https://github.com/Jigsaw-Code/rids"

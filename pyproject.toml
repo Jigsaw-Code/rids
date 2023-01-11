@@ -1,0 +1,30 @@
+[project]
+name = "rids"
+version = "0.1.0"
+description = "Remote Intrusion Detection System"
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["IDS", "cybersecurity"]
+license = {text = "Apache License 2.0"}
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: Apache Software License",
+  "Topic :: Internet",
+  "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = [
+  "absl-py",
+]
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tools.setuptools]
+packages = ["rids"]
+
+[project.scripts]
+rids = "rids.rids:main"
+
+[project.urls]
+repository = "https://github.com/Jigsaw-Code/rids"

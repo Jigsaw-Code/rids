@@ -30,7 +30,7 @@ import urllib.request
 from absl import app
 from absl import flags
 
-import network_capture
+from rids import network_capture
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('host_ip', None,
@@ -118,7 +118,7 @@ def main(argv):
       universal_newlines=True)
 
   # TODO define a class in packet_filter instead of using a function
-  # filter = packet_filter.Filter(); filter.add_bad_ips(bad_ips); ...
+  # filter = network_capture.Filter(); filter.add_bad_ips(bad_ips); ...
   for line in iter(ip_capture.stdout.readline, b''):
     network_capture.detect_bad_ips(line, bad_ips)
 

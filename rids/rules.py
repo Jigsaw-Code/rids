@@ -36,7 +36,7 @@ class RuleSet:
 
     def MergeRuleset(self, other):
       """Simple implementation of a merging of rule sets."""
-      for key, valuel in other.ip_address_rules:
+      for key, value in other.ip_address_rules.items():
         self.ip_address_rules[key].extend(value)
 
     def AddRule(self, rule):
@@ -51,15 +51,14 @@ class RuleSet:
     def ProcessEndpoint(self, observation):
       """Process observations related to a remote IP address."""
       ip_str = str(observation['remote_ip'])
+      events = []
       if ip_str in self.ip_address_rules:
-        events = []
         for rule in self.ip_address_rules[ip_str]:
           event = {}
           event.update(observation)
           event.update(rule.as_dict())
           events.append(event)
-        return events
-      return None
+      return events
 
 
 class Rule:
@@ -84,8 +83,10 @@ class Rule:
   def as_dict(self):
     """Returns full definition of the rule as a string."""
     return {
-        key: getattr(self, key)
-    for key in self.__slots__}
+        key: getattr(self, key) 
+        for key in self.__slots__
+        if hasattr(self, key)
+    }
 
 
 class Event:

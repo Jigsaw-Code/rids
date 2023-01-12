@@ -13,15 +13,17 @@
 # limitations under the License.
 
 """
-Generalizes the various formats of IOCs into a common class, RuleSet.
-RuleSet is a value type that represents evaluation on packets and connections.
-It can be constructed from one of the flavors of parsers in `rids.iocs` or
-merged from combining a pair of RuleSet instances.  Its constructor takes a
-dict (or equivalent) argument that mirrors the tree-like structure of its
-combined rules, for ease of creating new IOC decoders and when testing.
-Evaluation of the RuleSet is done with the process_connection(...) and
-process_packet(...) which take appropriate context objects and produce a
-list of zero or more Event instances from matching rules in the RuleSet.
+Generalizes the various formats of IOCs into Rule and RuleSet.
+
+Rule is a value type that represents evaluation on a single rule.  RuleSet
+instances represent a set of independent and overlapping Rule instances.
+
+RuleSet should typically be constructed from one of the flavors of parsers
+in `rids.iocs` or merged from combining a pair of RuleSet instances.  Its
+
+Evaluation of the RuleSet is done with the ProcessHandshake(...) and
+ProcessEndpoint(...) methods which take an observation and return a list
+of zero or more Event instances with their matching rules in the RuleSet.
 """
 
 

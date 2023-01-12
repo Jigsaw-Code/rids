@@ -21,22 +21,29 @@ import io
 import pytest
 
 from rids import network_capture
+from rids.iocs import bad_ip_list
 
 
 @pytest.fixture()
-def badips_map():
-  return {
-    '1.1.1.1': 'Source A',
-    '4.5.6.7': 'Best IOCs',
-    '100.12.34.56': 'Threatbusters',
-  }
+def bad_ips_ruleset():
+  parser = bad_ip_list.FeedParser({'name': 'TEST'})
+  return parser.ParseFile(io.BytesIO(b"""
+# comments are ok
+1.1.1.1
+100.12.34.56"""))
 
 
-def test_good_ip_is_ok(badips_map):
-  detected = network_capture.detect_bad_ips('0\t127.0.0.1\t1.2.3.4', badips_map)
-  assert not detected
+def test_good_ip_address(bad_ips_ruleset):
+  detected_events = bad_ips_ruleset.ProcessEndpoint({
+    'timestamp': 'Jan 10 13:37:42 EST 2023',
+    'remote_ip': '3.5.7.9',
+  })
+  assert not detected_events
 
 
-def test_bad_ip_is_logged(badips_map):
-  detected = network_capture.detect_bad_ips('1\t4.5.6.7\t127.0.0.1', badips_map)
-  assert detected
+def test_bad_ip_address(bad_ips_ruleset):
+  detected_events = bad_ips_ruleset.ProcessEndpoint({
+    'timestamp': 'Jan 10 13:37:68 EST 2023',
+    'remote_ip': '100.12.34.56',
+  })
+  assert detected_events

@@ -19,7 +19,7 @@ import subprocess
 from rids import observations
 
 
-class RemoteServerScanner:
+class IpPacketMonitor:
   """Continuously scans the network traffic for remote IPs being contacted.
   The scan() function is an iterator that produces a dict{...} representing
   the endpoints (specifically the `remote_ip` and `remote_port` fields).  This
@@ -31,7 +31,7 @@ class RemoteServerScanner:
 
   def monitor(self):
     """Generator for observations of remote IP addresses."""
-    self._proc = _start_tshark([
+    proc = _start_tshark([
         '-f', f'ip and src ip == {self._host_ip}',
         '-Tfields',
         # The order of the following fields determines the ordering in output
@@ -40,7 +40,7 @@ class RemoteServerScanner:
         '-l',
     ])
 
-    for line in iter(self._proc.stdout.readline, b''):
+    for line in iter(proc.stdout.readline, b''):
       values = line.split('\t')
       ip_info = observations.IpPacket(
         timestamp=values[0],
@@ -48,7 +48,7 @@ class RemoteServerScanner:
       yield ip_info
 
 
-class HandshakeScanner:
+class TlsConnectionMonitor:
   """Continuously scans the network traffic for TLS handshakes.
   The scan() function is an iterator that produces a tuple of
     (client_hello, server_hello)

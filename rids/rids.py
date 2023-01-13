@@ -97,7 +97,7 @@ def _inspect_remote_endpoints(host_ip, ruleset, q):
     ruleset: a RuleSet object to perform evaluation with
     q: a Queue for relaying events back to the main thread
   """
-  remote_ip = network_capture.RemoteServerScanner(host_ip)
+  remote_ip = network_capture.IpPacketMonitor(host_ip)
   for ip_info in remote_ip.monitor():
     events = ruleset.match_ip(ip_info)
     for event in events:

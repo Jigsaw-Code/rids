@@ -18,6 +18,7 @@
 import urllib.request
 
 from rids.iocs import bad_ip_list
+from rids import rules
 
 
 _PARSERS = {
@@ -25,24 +26,25 @@ _PARSERS = {
 }
 
 
-def fetch_and_parse_ruleset(ioc_config):
+def fetch_iocs(rids_config):
   """Parses the IOC indicated by `ioc_config` into a RuleSet instance.
   
   Args:
-    ioc_config: dict{'name', 'url', 'format'}
-  """
-  format = ioc_config['format']
-  if format not in _PARSERS:
-    raise ValueError('Unrecognized IOC feed format |{format}|')
-  
-  parser = _PARSERS[format](ioc_config)
-  return parser.Parse(_fetch_contents(ioc_config['url']), ioc_config['name'])
+    rids_config: { 'iocs': list[dict{'name', 'url', 'format'}] }
 
-
-def _fetch_contents(fullurl):
-  """Fetch the data contents (encoded as utf-8) for the resource found at `url`.
-  
-  Args:
-    fullurl: string to URL where the IOC feed data is found.
+  Returns:
+    RuleSet representing all IOCs in the config.
   """
-  with urllib.request.urlopen()
+  ioc_config = rids_config.get('iocs', None)
+  if not ioc_config:
+    return rules.RuleSet()
+
+  ruleset = rules.RuleSet()
+  for ioc in ioc_config:
+    format = ioc['format']
+    if format not in _PARSERS:
+      raise ValueError('Unrecognized IOC feed format |{format}|')
+
+    parser = _PARSERS[format](ioc_config)
+    with urllib.request.urlopen(ioc_config['url']) as ioc_data:
+      parser.ParseRules(ioc_data, ruleset)

@@ -28,67 +28,75 @@ of zero or more Event instances with their matching rules in the RuleSet.
 
 
 import collections
+from dataclasses import dataclass
+
+from rids import observations
 
 
 class RuleSet:
-    __slots__ = ('ip_address_rules', )
+    __slots__ = ('ip_address_rules', 'allowed_sni_port') 
 
     def __init__(self):
       self.ip_address_rules = collections.defaultdict(list)
+      # TODO this allow-list could be expressed in terms of rules from a file
+      # similar to the indicators of compromise, but explicitly coded for now.
+      self.allowed_sni_port = set([
+          ('mtalk.google.com', 5228),
+          ('proxy-safebrowsing.googleapis.com', 80),
+          ('courier.push.apple.com', 5223),
+          ('imap.gmail.com', 993),
+      ])
 
-    def MergeRuleset(self, other):
-      """Simple implementation of a merging of rule sets."""
-      for key, value in other.ip_address_rules.items():
-        self.ip_address_rules[key].extend(value)
-
-    def AddRule(self, rule):
+    def add_ip_rule(self, ip_rule):
       """Simple implementation of adding a single rule to this rule set."""
-      if hasattr(rule, 'matches_ip'):
-        self.ip_address_rules[str(rule.matches_ip)].append(rule)
+      self.ip_address_rules[str(ip_rule.matches_ip)].append(ip_rule)
 
-    def ProcessHandshake(self, observation):
+    def match_tls(self, tls_connection):
       """Process a handshake-related observation."""
-      return Event(observation)
+      sni_and_port = (tls_connection.server_name, tls_connection.remote_port)
+      if sni_and_port in self.allowed_sni_port:
+        return []
+      return [Event(tls_connection)]
 
-    def ProcessEndpoint(self, observation):
+    def match_ip(self, ip_packet):
       """Process observations related to a remote IP address."""
-      ip_str = str(observation['remote_ip'])
+      ip_str = str(ip_packet.ip_address)
       events = []
       if ip_str in self.ip_address_rules:
         for rule in self.ip_address_rules[ip_str]:
-          event = {}
-          event.update(observation)
-          event.update(rule.as_dict())
+          event = Event({
+            'timestamp': ip_packet.timestamp,
+            'remote_ip': ip_packet.ip_address,
+            'msg': rule.msg,
+            'name': rule.name,
+            'url': rule.url,
+            'fetched': rule.fetched,
+            'reference': rule.reference,
+          })
           events.append(event)
       return events
 
 
-class Rule:
+@dataclass
+class IpRule:
   """Represents a single rule that accommodates a variety of IOC rule types."""
-  __slots__ = ('msg', 'source', 'fetched', 'matches_ip')
-  # TODO: include source rule properties like 'reference', 'header', 'options'
 
-  def __init__(self, **properties):
-    for key, value in properties.items():
-      setattr(self, key, value)
+  msg: str
+  name: str
+  url: str 
+  fetched: str
+  matches_ip: observations.IpType
+  reference: str = None
 
   def __str__(self):
     output = [
         f'{self.msg}',
-        f'Found in [{self.source}] last fetched at {self.fetched}',
+        f'Found in [{self.name}] last fetched at {self.fetched}',
     ]
     
-    if hasattr(self, 'reference'):
+    if self.reference:
       output.append(self.reference)
     return '\n'.join(output)
-
-  def as_dict(self):
-    """Returns full definition of the rule as a string."""
-    return {
-        key: getattr(self, key) 
-        for key in self.__slots__
-        if hasattr(self, key)
-    }
 
 
 class Event:

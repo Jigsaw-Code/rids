@@ -20,30 +20,33 @@ Tests for the network_capture library.
 import io
 import pytest
 
-from rids import network_capture
+from rids import observations
+from rids import rules
 from rids.iocs import bad_ip_list
 
 
 @pytest.fixture()
 def bad_ips_ruleset():
-  parser = bad_ip_list.FeedParser({'name': 'TEST'})
-  return parser.ParseFile(io.BytesIO(b"""
+  parser = bad_ip_list.FeedParser({'name': 'TEST', 'url': 'test'})
+  ruleset = rules.RuleSet()
+  parser.ParseRules(io.BytesIO(b"""
 # comments are ok
 1.1.1.1
-100.12.34.56"""))
+100.12.34.56"""), ruleset)
+  return ruleset
 
 
 def test_good_ip_address(bad_ips_ruleset):
-  detected_events = bad_ips_ruleset.ProcessEndpoint({
-    'timestamp': 'Jan 10 13:37:42 EST 2023',
-    'remote_ip': '3.5.7.9',
-  })
+  ip_packet = observations.IpPacket(
+    timestamp='Jan 10 13:37:42 EST 2023',
+    ip_address='3.5.7.9')
+  detected_events = bad_ips_ruleset.match_ip(ip_packet)
   assert not detected_events
 
 
 def test_bad_ip_address(bad_ips_ruleset):
-  detected_events = bad_ips_ruleset.ProcessEndpoint({
-    'timestamp': 'Jan 10 13:37:68 EST 2023',
-    'remote_ip': '100.12.34.56',
-  })
+  ip_packet = observations.IpPacket(
+    timestamp='Jan 10 13:37:68 EST 2023',
+    ip_address='100.12.34.56')
+  detected_events = bad_ips_ruleset.match_ip(ip_packet)
   assert detected_events

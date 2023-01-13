@@ -16,6 +16,8 @@
 import ipaddress
 import subprocess
 
+from rids import observations
+
 
 class RemoteServerScanner:
   """Continuously scans the network traffic for remote IPs being contacted.
@@ -25,8 +27,12 @@ class RemoteServerScanner:
   process is closed.
   """
   def __init__(self, host_ip):
+    self._host_ip = host_ip
+
+  def monitor(self):
+    """Generator for observations of remote IP addresses."""
     self._proc = _start_tshark([
-        '-f', 'ip and src ip == {host_ip}',
+        '-f', f'ip and src ip == {self._host_ip}',
         '-Tfields',
         # The order of the following fields determines the ordering in output
         '-e', 'frame.time',
@@ -34,15 +40,12 @@ class RemoteServerScanner:
         '-l',
     ])
 
-  def scan(self):
-    """Generator for observations of remote IP addresses."""
     for line in iter(self._proc.stdout.readline, b''):
       values = line.split('\t')
-      observation = {
-        'timestamp': values[0],
-        'remote_ip': values[1],
-      }
-      yield observation
+      ip_info = observations.IpPacket(
+        timestamp=values[0],
+        remote_ip=ipaddress.ip_address(values[1]))
+      yield ip_info
 
 
 class HandshakeScanner:
@@ -54,10 +57,15 @@ class HandshakeScanner:
   `remote_ip`, `remote_port`, `sni` (if present), `ja3`, `ja3s` as properties.
   """
   def __init__(self, host_ip):
-    self._proc = _start_tshark([
+    self._tls_streams = {}
+    self._host_ip = host_ip
+
+  def monitor(self):
+    """Generator for observations of unusual TLS traffic."""
+    proc = _start_tshark([
         '-f', 'tcp and not (src port 443 or dst port 443)',
-        '-Y', (f'(tls.handshake.type == 1 and ip.src == {host_ip})' +
-              f'or (tls.handshake.type == 2 and ip.dst == {host_ip})'),
+        '-Y', (f'(tls.handshake.type == 1 and ip.src == {self._host_ip})' +
+               f'or (tls.handshake.type == 2 and ip.dst == {self._host_ip})'),
         '-Tfields',
         # Ordering of the following fields determines the ordering in output,
         # except that missing fields are skipped.
@@ -75,44 +83,27 @@ class HandshakeScanner:
         '-e', 'tls.handshake.ja3s_full',
         '-l',
     ])
-    self._tls_streams = {}
 
-  # Ignore these false positives.
-  # TODO: include these in handshake-related rules instead of filtering here?
-  _allowed_sni_port = set([
-      ('mtalk.google.com', 5228),
-      ('proxy-safebrowsing.googleapis.com', 80),
-      ('courier.push.apple.com', 5223),
-      ('imap.gmail.com', 993),
-  ])
-
-  def scan(self):
-    """Generator for observations of unusual TLS traffic."""
-    for line in iter(self._proc.stdout.readline, b''):
+    for line in iter(proc.stdout.readline, b''):
       values = line.split('\t')
-      observation = {
-        'timestamp': values[0],
-      }
       stream_id = int(values[1])
       if int(values[2]) == 1:  # client hello
-        sni_and_port = (values[7], int(values[6]))
-        if sni_and_port in self._allowed_sni_port:
-          continue
-
-        observation['remote_ip'] = ipaddress.ip_address(values[5])
-        observation['remote_port'] = int(values[6])
-        observation['server_name'] = values[7]
-        observation['ja3'] = values[8]
-        observation['ja3_full'] = values[9]
-        self._tls_streams[stream_id] = observation
+        tls_info = observations.TlsConnection(
+            timestamp=values[0],
+            remote_ip=ipaddress.ip_address(values[5]),
+            remote_port=int(values[6]),
+            server_name=values[7],
+            ja3=values[8],
+            ja3_full=values[9])
+        self._tls_streams[stream_id] = tls_info
 
       elif int(values[2]) == 2:  # server hello
-        observation = self._tls_streams.get(stream_id, None)
-        if not observation:
+        tls_info = self._tls_streams.get(stream_id, None)
+        if not tls_info:
           continue
-        observation['ja3s'] = values[8]
-        observation['ja3s_full'] = values[9]
-        yield observation
+        tls_info.ja3s = values[8]
+        tls_info.ja3s_full = values[9]
+        yield tls_info
         del self._tls_streams[stream_id]
 
 

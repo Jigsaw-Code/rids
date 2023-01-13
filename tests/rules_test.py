@@ -20,6 +20,7 @@ import ipaddress
 import pytest
 
 from rids import rules
+from rids import observations
 
 
 @pytest.fixture()
@@ -30,29 +31,35 @@ def ruleset():
 
 
 def test_add_rules(ruleset):
-  r1 = rules.Rule(matches_ip='1.2.3.4')
-  ruleset.AddRule(r1)
-  ruleset.AddRule(rules.Rule(matches_ip='5.6.7.8'))
+  r1 = rules.IpRule(
+    msg='test msg',
+    name='test name',
+    url='test url',
+    fetched='fetched when?',
+    matches_ip=ipaddress.ip_address('1.2.3.4'))
+  ruleset.add_ip_rule(r1)
+  ruleset.add_ip_rule(rules.IpRule(
+    msg='test msg',
+    name='test name',
+    url='test url',
+    fetched='fetched later.',
+    matches_ip=ipaddress.ip_address('5.6.7.8')))
 
 
-def test_merge_rules(ruleset):
-  ruleset.AddRule(rules.Rule(matches_ip='2.2.2.2', msg='hello'))
-  ruleset.AddRule(rules.Rule(matches_ip='3.2.2.255'))
-  ruleset.AddRule(rules.Rule(matches_ip='3.3.3.3'))
-  other_ruleset = rules.RuleSet()
-  other_ruleset.AddRule(rules.Rule(matches_ip='2.2.2.2', msg='test'))
-
-  assert 1 == len(ruleset.ProcessEndpoint(
-      {'remote_ip': ipaddress.ip_address('2.2.2.2')}))
-  ruleset.MergeRuleset(other_ruleset)
-  assert 2 == len(ruleset.ProcessEndpoint(
-      {'remote_ip': ipaddress.ip_address('2.2.2.2')}))
+def _make_ip_rule(ip_address):
+  return rules.IpRule(
+    msg='test msg',
+    name='test name',
+    url='test url',
+    fetched='test fetched time',
+    matches_ip=ipaddress.ip_address(ip_address))
 
 
-def test_process_endpoint(ruleset):
-  ruleset.AddRule(rules.Rule(matches_ip='2.2.2.2', msg='hello'))
-  ruleset.AddRule(rules.Rule(matches_ip='3.2.2.255'))
-  events = ruleset.ProcessEndpoint(
-      {'remote_ip': ipaddress.ip_address('2.2.2.2')})
+def test_match_ip(ruleset):
+  ruleset.add_ip_rule(_make_ip_rule('2.2.2.2'))
+  ruleset.add_ip_rule(_make_ip_rule('3.2.2.255'))
+  events = ruleset.match_ip(observations.IpPacket(
+    timestamp='...',
+    ip_address=ipaddress.ip_address('2.2.2.2')))
   assert len(events) == 1
-  assert events[0]['remote_ip'] == ipaddress.ip_address('2.2.2.2')
+  assert events[0].properties['remote_ip'] == ipaddress.ip_address('2.2.2.2')

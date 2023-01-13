@@ -24,13 +24,13 @@ from rids import rules
 class FeedParser:
   """Parses newline-separated list of IP addresses into a RuleSet."""
   def __init__(self, config):
+    self.source_url = config['url']
     self.source_name = config.get('name', 'UNKNOWN')
     self.msg = config.get('msg', 'contact with a potentially compromised host')
 
-  def ParseFile(self, ioc_filedata):
+  def ParseRules(self, ioc_data, ruleset):
     timestamp = str(datetime.now())
-    ruleset = rules.RuleSet()
-    for line in ioc_filedata.readlines():
+    for line in ioc_data.readlines():
       line = line.decode('utf-8').strip()
       if not line or line[0] == '#':
         # skip empty lines and comments
@@ -41,12 +41,11 @@ class FeedParser:
         # Do nothing with badly-formatted addresses in these files.
         continue
 
-      rule = rules.Rule(
+      rule = rules.IpRule(
           msg=self.msg,
-          source=self.source_name,
+          name=self.source_name,
+          url=self.source_url,
           fetched=timestamp,
           matches_ip=bad_ip,
       )
-      ruleset.AddRule(rule)
-
-    return ruleset
+      ruleset.add_ip_rule(rule)

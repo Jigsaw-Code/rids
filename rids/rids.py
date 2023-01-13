@@ -30,17 +30,15 @@ import queue
 from absl import app
 from absl import flags
 
-from rids import config
 from rids import network_capture
 from rids.iocs import iocs
-from rids import rules
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('host_ip', None,
                     'The IP of the host process, for ignoring direct requests')
 flags.DEFINE_string('config_path', '/etc/rids/config.json',
                     'file path indicating where IOC configuration can be found')
-flags.DEFINE_string('eventlog_path', '/var/rids/events.log',
+flags.DEFINE_string('eventlog_path', None,
                     'file path indicating where to append new event logs')
 
 
@@ -49,16 +47,15 @@ def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
 
-  logging.basicConfig(level=logging.DEBUG,
-                      format='%(asctime)s %(levelname)-8s %(message)s',
-                      datefmt='%m-%d %H:%M',
-                      filename=FLAGS.eventlog_path,
-                      filemode='a')
+  if FLAGS.eventlog_path:
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s %(levelname)-8s %(message)s',
+                        datefmt='%m-%d %H:%M',
+                        filename=FLAGS.eventlog_path,
+                        filemode='a')
 
-  cfg = config.ParseFile(FLAGS.config_path)
-  ruleset = rules.RuleSet()
-  for ioc_config in cfg['iocs']:
-    ruleset.MergeRuleset(iocs.parse_ruleset(ioc_config))
+  config = _load_config()
+  ruleset = iocs.fetch_iocs(config)
 
   host_ip = _get_host_ip()
   print(f'Using {host_ip} as host IP address')
@@ -86,9 +83,9 @@ def _inspect_tls_traffic(host_ip, ruleset, q):
     ruleset: a RuleSet object to perform evaluation with
     q: a Queue for relaying events back to the main thread
   """
-  tls_capture = network_capture.HandshakeScanner(host_ip)
-  for observation in tls_capture.scan():
-    events = ruleset.ProcessHandshake(observation)
+  tls_connection = network_capture.TlsConnectionMonitor(host_ip)
+  for tls_info in tls_connection.monitor():
+    events = ruleset.match_tls(tls_info)
     for event in events:
       q.put(event)
 
@@ -100,9 +97,9 @@ def _inspect_remote_endpoints(host_ip, ruleset, q):
     ruleset: a RuleSet object to perform evaluation with
     q: a Queue for relaying events back to the main thread
   """
-  remote_ip_capture = network_capture.RemoteServerScanner(host_ip)
-  for observation in remote_ip_capture.scan():
-    events = ruleset.ProcessEndpoint(observation)
+  remote_ip = network_capture.RemoteServerScanner(host_ip)
+  for ip_info in remote_ip.monitor():
+    events = ruleset.match_ip(ip_info)
     for event in events:
       q.put(event)
 
@@ -119,6 +116,14 @@ def _get_host_ip():
       host_ip = my_ip.read().decode("utf-8").strip()
   host_ip = ipaddress.ip_address(host_ip)
   return host_ip
+
+
+def _load_config():
+  config = {}
+  if FLAGS.config_path:
+    with open(FLAGS.config_path) as f:
+      config = json.load(f)
+  return config
 
 
 if __name__ == '__main__':

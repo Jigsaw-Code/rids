@@ -14,15 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
 """
 Main entry point for RIDS, a Remote Intrusion Detection System.
 """
 
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 import ipaddress
 import json
 import logging
+import os
 import threading
 import urllib
 import queue
@@ -30,12 +32,14 @@ import queue
 from absl import app
 from absl import flags
 
-from rids import network_capture
 from rids.iocs import iocs
+from rids.monitors.tls_monitor import TlsConnectionMonitor
+from rids.monitors.ip_monitor import IpPacketMonitor
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('host_ip', None,
-                    'The IP of the host process, for ignoring direct requests')
+                    'The IP of the host process, helps determine whether an IP '
+                    'is a client or a remote endpoint.')
 flags.DEFINE_string('config_path', '/etc/rids/config.json',
                     'file path indicating where IOC configuration can be found')
 flags.DEFINE_string('eventlog_path', None,
@@ -47,12 +51,12 @@ def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
 
-  if FLAGS.eventlog_path:
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s %(levelname)-8s %(message)s',
-                        datefmt='%m-%d %H:%M',
-                        filename=FLAGS.eventlog_path,
-                        filemode='a')
+  eventlog_path = _get_eventlog_path()
+  logging.basicConfig(level=logging.DEBUG,
+                      format='%(asctime)s %(levelname)-8s %(message)s',
+                      datefmt='%m-%d %H:%M',
+                      filename=eventlog_path,
+                      filemode='a')
 
   config = _load_config()
   ruleset = iocs.fetch_iocs(config)
@@ -61,19 +65,21 @@ def main(argv):
   print(f'Using {host_ip} as host IP address')
 
   event_queue = queue.Queue()
-  threading.Thread(
-      target=_inspect_tls_traffic,
-      args=(host_ip, ruleset, event_queue))
-  threading.Thread(
-      target=_inspect_remote_endpoints,
-      args=(host_ip, ruleset, event_queue))
-
-  while True:
-    # We just log the suspicious events for now, but here is where we could
-    # do post-processing and/or share sightings of known / unknown threats.
-    event = event_queue.get()
-    logging.log(json.puts(event))
-    event_queue.task_done()
+  loop = asyncio.get_event_loop()
+  with ProcessPoolExecutor(max_workers=3) as executor:
+    loop.run_in_executor(
+        executor,
+        partial(_inspect_tls_traffic, host_ip, ruleset, event_queue))
+    loop.run_in_executor(
+        executor,
+        partial(_inspect_remote_endpoints, host_ip, ruleset, event_queue))
+  
+    while True:
+      # We just log the suspicious events for now, but here is where we could
+      # do post-processing and/or share sightings of known / unknown threats.
+      event = event_queue.get()
+      logging.log(json.puts(event))
+      event_queue.task_done()
 
 
 def _inspect_tls_traffic(host_ip, ruleset, q):
@@ -81,9 +87,9 @@ def _inspect_tls_traffic(host_ip, ruleset, q):
   
   Args:
     ruleset: a RuleSet object to perform evaluation with
-    q: a Queue for relaying events back to the main thread
+    q: a queue.Queue for relaying events back to the main thread
   """
-  tls_connection = network_capture.TlsConnectionMonitor(host_ip)
+  tls_connection = TlsConnectionMonitor(host_ip)
   for tls_info in tls_connection.monitor():
     events = ruleset.match_tls(tls_info)
     for event in events:
@@ -95,9 +101,9 @@ def _inspect_remote_endpoints(host_ip, ruleset, q):
 
   Args:
     ruleset: a RuleSet object to perform evaluation with
-    q: a Queue for relaying events back to the main thread
+    q: a queue.Queue for relaying events back to the main thread
   """
-  remote_ip = network_capture.IpPacketMonitor(host_ip)
+  remote_ip = IpPacketMonitor(host_ip)
   for ip_info in remote_ip.monitor():
     events = ruleset.match_ip(ip_info)
     for event in events:
@@ -119,11 +125,27 @@ def _get_host_ip():
 
 
 def _load_config():
+  """Read and parse the config file contents.
+  
+  Returns:
+    dict of config contents
+  """
   config = {}
   if FLAGS.config_path:
     with open(FLAGS.config_path) as f:
       config = json.load(f)
   return config
+
+
+def _get_eventlog_path():
+  """Determine where to save the event logs.
+  
+  If not specified in the flag, use the current working directory.
+  """
+  path = FLAGS.eventlog_path
+  if not path:
+    path = os.getcwd()
+  return path
 
 
 if __name__ == '__main__':

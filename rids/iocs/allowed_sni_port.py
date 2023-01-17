@@ -12,28 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from dataclasses import dataclass
-import ipaddress
-from typing import Union
+"""IOC parser for allowing certain unusual (server name, port) sightings."""
 
 
-IpType = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+from rids.iocs.iocs import RuleSet
+from rids.monitors.tls_monitor import TlsRule
 
 
-@dataclass
-class IpPacket:
-  timestamp: str
-  ip_address: IpType
+class AllowedEndpoints:
+  """Parses allowed (sni, port) pairs directly from an ioc_sources config."""
+  def __init__(self, config):
+    self.name = config['name']
+    self.allowlist = config['allow']
 
-
-@dataclass
-class TlsConnection:
-  timestamp: str
-  remote_ip: IpType
-  remote_port: int
-  server_name: str
-  ja3: str
-  ja3_full: str
-  ja3s: str
-  ja3s_full: str
+  def provide_rules(self, ruleset: RuleSet):
+    for sni, port in self.allowlist:
+      tls_rule = TlsRule(
+          allowed_sni=sni,
+          expected_port=port)
+      ruleset.add_tls_rule(tls_rule)

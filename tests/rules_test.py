@@ -23,14 +23,8 @@ from rids import rules
 from rids import observations
 
 
-@pytest.fixture()
-def ruleset():
+def test_add_rules():
   ruleset = rules.RuleSet()
-  # ... could add some default rules here
-  return ruleset
-
-
-def test_add_rules(ruleset):
   r1 = rules.IpRule(
     msg='test msg',
     name='test name',
@@ -55,7 +49,8 @@ def _make_ip_rule(ip_address):
     matches_ip=ipaddress.ip_address(ip_address))
 
 
-def test_match_ip(ruleset):
+def test_match_ip():
+  ruleset = ruleset.RuleSet()
   ruleset.add_ip_rule(_make_ip_rule('2.2.2.2'))
   ruleset.add_ip_rule(_make_ip_rule('3.2.2.255'))
   events = ruleset.match_ip(observations.IpPacket(
@@ -63,3 +58,7 @@ def test_match_ip(ruleset):
     ip_address=ipaddress.ip_address('2.2.2.2')))
   assert len(events) == 1
   assert events[0].properties['remote_ip'] == ipaddress.ip_address('2.2.2.2')
+
+
+def test_match_tls():
+  ruleset = ruleset.RuleSet()

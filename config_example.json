@@ -1,29 +1,39 @@
 {
   "ioc_sources": [
     {
+      "format": "BAD_IP_LIST",
       "name": "EmergingThreats compromised IP addresses",
-      "url": "https://rules.emergingthreats.net/open/suricata-5.0/rules/compromised-ips.txt",
-      "format": "BAD_IP_LIST"
+      "url": "https://rules.emergingthreats.net/open/suricata-5.0/rules/compromised-ips.txt"
     },
     {
+      "format": "BAD_IP_LIST",
       "name": "3CORESec Poor Reputation IPs",
-      "url": "https://blacklist.3coresec.net/lists/et-open.txt",
-      "format": "BAD_IP_LIST"
+      "url": "https://blacklist.3coresec.net/lists/et-open.txt"
     },
     {
+      "format": "BAD_IP_LIST",
       "name": "CINSscore badguys list - cinsscore.com",
-      "url": "https://cinsscore.com/list/ci-badguys.txt",
-      "format": "BAD_IP_LIST"
+      "url": "https://cinsscore.com/list/ci-badguys.txt"
     },
     {
+      "format": "BAD_IP_LIST",
       "name": "blocklist.de suspicious IPs",
-      "url": "https://lists.blocklist.de/lists/all.txt",
-      "format": "BAD_IP_LIST"
+      "url": "https://lists.blocklist.de/lists/all.txt"
     },
     {
+      "format": "BAD_IP_LIST",
       "name": "TOR exit nodes (dan.me.uk)",
-      "url": "https://www.dan.me.uk/torlist/?exit",
-      "format": "BAD_IP_LIST"
+      "url": "https://www.dan.me.uk/torlist/?exit"
+    },
+    {
+      "format": "ALLOWED_SNI_PORT",
+      "name": "recognized unusual TLS (name, port) combinations",
+      "allow": [
+          ["mtalk.google.com", 5228],
+          ["proxy-safebrowsing.googleapis.com", 80],
+          ["courier.push.apple.com", 5223],
+          ["imap.gmail.com", 993]
+      ]
     }
   ]
 }

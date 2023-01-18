@@ -27,6 +27,7 @@ import logging
 import os
 import urllib
 import queue
+from typing import Union
 
 from absl import app
 from absl import flags
@@ -72,7 +73,7 @@ def main(argv):
         partial(_inspect_tls_traffic, host_ip, ruleset, event_queue))
     loop.run_in_executor(
         executor,
-        partial(_inspect_remote_endpoints, host_ip, ruleset, event_queue))
+        partial(_inspect_remote_ips, host_ip, ruleset, event_queue))
   
     while True:
       # We just log the suspicious events for now, but here is where we could
@@ -82,10 +83,14 @@ def main(argv):
       event_queue.task_done()
 
 
-def _inspect_tls_traffic(host_ip, ruleset, q):
+IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+
+def _inspect_tls_traffic(host_ip: IpAddress, ruleset: RuleSet, q: queue.Queue):
   """Worker function for thread that inspects client and server hellos.
   
   Args:
+    host_ip: the IP address associated with this server, for determining
+        client hellos and server hellos not interfacing directly with this host
     ruleset: a RuleSet object to perform evaluation with
     q: a queue.Queue for relaying events back to the main thread
   """
@@ -96,10 +101,12 @@ def _inspect_tls_traffic(host_ip, ruleset, q):
       q.put(event)
 
 
-def _inspect_remote_endpoints(host_ip, ruleset, q):
+def _inspect_remote_ips(host_ip: IpAddress, ruleset: RuleSet, q: queue.Queue):
   """Worker function for thread that inspects remote IP addresses.
 
   Args:
+    host_ip: the IP address associated with this server, for determining
+        which IP addresses are considered remote IPs
     ruleset: a RuleSet object to perform evaluation with
     q: a queue.Queue for relaying events back to the main thread
   """
@@ -110,7 +117,7 @@ def _inspect_remote_endpoints(host_ip, ruleset, q):
       q.put(event)
 
 
-def _get_host_ip():
+def _get_host_ip() -> IpAddress:
   """Retrieves the host IP address from its flag, else from a remote site.
   
   Returns:
@@ -124,7 +131,7 @@ def _get_host_ip():
   return host_ip
 
 
-def _load_config():
+def _load_config() -> dict:
   """Read and parse the config file contents.
   
   Returns:
@@ -137,7 +144,7 @@ def _load_config():
   return config
 
 
-def _get_eventlog_path():
+def _get_eventlog_path() -> str:
   """Determine where to save the event logs.
   
   If not specified in the flag, use the current working directory.

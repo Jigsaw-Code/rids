@@ -28,4 +28,4 @@ class AllowedEndpoints:
   def provide_rules(self, ruleset: RuleSet):
     """Add rules to the TlsMatcher according to the configured allowlist."""
     for server_name, port in self.allowlist:
-      ruleset.tls_matcher.add_allowed_sni(server_name, port)
+      ruleset.tls_matcher.add_allowed_endpoint(server_name, port)

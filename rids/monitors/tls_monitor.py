@@ -14,6 +14,7 @@
 
 
 from dataclasses import dataclass
+from datetime import datetime
 import ipaddress
 from typing import Generator
 from typing import Union
@@ -26,7 +27,7 @@ IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 @dataclass
 class TlsConnection:
   """Represents salient properties of a TLS connection and when it was seen."""
-  timestamp: str  # TODO: use a real datetime type if doing calculations with it
+  timestamp: datetime
   remote_ip: IpAddress
   remote_port: int
   server_name: str
@@ -73,7 +74,7 @@ class TlsConnectionMonitor:
       stream_id = int(values[1])
       if int(values[2]) == 1:  # client hello
         tls_info = TlsConnection(
-            timestamp=values[0],
+            timestamp=datetime.strptime(values[0], '%b %d, %Y %H:%M:%S %Z'),
             remote_ip=ipaddress.ip_address(values[5]),
             remote_port=int(values[6]),
             server_name=values[7],

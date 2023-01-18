@@ -23,7 +23,7 @@ class TlsMatcher:
   def __init__(self):
     self.allowed_sni_port = set()
 
-  def add_allowed_sni(self, allowed_sni: str, expected_port: int) -> None:
+  def add_allowed_endpoint(self, allowed_sni: str, expected_port: int) -> None:
     """Add a single TLS connection-based rule to this rule set."""
     self.allowed_sni_port.add((allowed_sni, expected_port))
 

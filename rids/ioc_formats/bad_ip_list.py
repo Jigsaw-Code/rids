@@ -21,7 +21,6 @@ import urllib.request
 
 from rids.iocs import RuleSet
 from rids.rules.ip_matcher import IpRule
-from rids.rules.ip_matcher import IpMatcher
 from rids.rules.ruleset import RuleSet
 
 

@@ -20,6 +20,7 @@ IpRule for representing the IOCs that packets should be checked against.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 import ipaddress
 from typing import Union
 from typing import Generator
@@ -33,7 +34,7 @@ IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 @dataclass
 class IpPacket:
   """Represents a remote IP endpoint and when it was seen."""
-  timestamp: str  # TODO: if calculating duration with this, make it a datetime
+  timestamp: datetime
   ip_address: IpAddress
 
 
@@ -60,7 +61,7 @@ class IpPacketMonitor:
     for line in iter(tshark_process.stdout.readline, b''):
       values = line.strip().split('\t')
       ip_info = IpPacket(
-        timestamp=values[0],
+        timestamp=datetime.strptime(values[0], '%b %d, %Y %H:%M:%S %Z'),
         remote_ip=ipaddress.ip_address(values[1]))
       yield ip_info
 

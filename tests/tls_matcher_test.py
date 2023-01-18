@@ -27,8 +27,8 @@ from rids.monitors.tls_monitor import TlsConnection
 @pytest.fixture()
 def tls_matcher() -> TlsMatcher:
   tls_matcher = TlsMatcher()
-  tls_matcher.add_allowed_sni('example.com', 421)
-  tls_matcher.add_allowed_sni('justchatting.com', 5223)
+  tls_matcher.add_allowed_endpoint('example.com', 421)
+  tls_matcher.add_allowed_endpoint('justchatting.com', 5223)
   return tls_matcher
 
 

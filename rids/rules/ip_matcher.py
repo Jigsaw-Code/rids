@@ -16,10 +16,12 @@ import collections
 import datetime
 from dataclasses import dataclass
 import ipaddress
-from types import Union
+from typing import Union
 
 from rids.event import Event
 from rids.monitors import ip_monitor
+
+IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 
 
 @dataclass
@@ -30,7 +32,7 @@ class IpRule:
   name: str
   url: str 
   fetched: datetime.datetime
-  matches_ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+  matches_ip: IpAddress
   reference: str = None
 
   def __str__(self):

@@ -14,12 +14,10 @@
 
 from dataclasses import dataclass
 
-from rids.rules import ip_matcher
-from rids.rules import tls_matcher
+from rids.rules.ip_matcher import IpMatcher
+from rids.rules.tls_matcher import TlsMatcher
 
 
-@dataclass
 class RuleSet:
-  ip_matcher : ip_matcher.IpMatcher = ip_matcher.IpMatcher()
-  tls_matcher : tls_matcher.TlsMatcher = tls_matcher.TlsMatcher()
-
+  ip_matcher : IpMatcher = IpMatcher()
+  tls_matcher : TlsMatcher = TlsMatcher()

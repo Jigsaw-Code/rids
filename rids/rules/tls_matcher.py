@@ -21,12 +21,11 @@ class TlsMatcher:
   """Index over TLS-related rules to match against."""
 
   def __init__(self):
-    self.allowed_sni_port = {}
+    self.allowed_sni_port = set()
 
-  def add_allowed_sni(self, allowed_sni, expected_port) -> None:
+  def add_allowed_sni(self, allowed_sni: str, expected_port: int) -> None:
     """Add a single TLS connection-based rule to this rule set."""
-    self.allowed_tls_name_port.add(
-        (allowed_sni, expected_port))
+    self.allowed_sni_port.add((allowed_sni, expected_port))
 
   def match_tls(self, tls_connection: tls_monitor.TlsConnection) -> Event:
     """Process observations of TLS client/server hellos.

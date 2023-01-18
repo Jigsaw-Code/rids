@@ -15,14 +15,13 @@
 
 from dataclasses import dataclass
 import ipaddress
-from types import Generator
-from types import Union
+from typing import Generator
+from typing import Union
 
 from rids.monitors import tshark
 
-
-# union type for IPv4 and IPv6 addresses
 IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+
 
 @dataclass
 class TlsConnection:
@@ -42,11 +41,11 @@ class TlsConnectionMonitor:
 
   Use monitor() to generate TlsConnection instances from network traffic.
   """
-  def __init__(self, host_ip):
+  def __init__(self, host_ip: IpAddress):
     self._tls_streams = {}
     self._host_ip = host_ip
 
-  def monitor(self) -> Generator[TlsConnection]:
+  def monitor(self) -> Generator[TlsConnection, None, None]:
     """Generator for observations of unusual TLS traffic.
     
     """

@@ -20,15 +20,13 @@ IpRule for representing the IOCs that packets should be checked against.
 """
 
 from dataclasses import dataclass
-import datetime
 import ipaddress
-from types import Generator
-from types import Union
+from typing import Union
+from typing import Generator
 
 from rids.monitors import tshark
 
 
-# union type for IPv4 and IPv6
 IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 
 
@@ -49,7 +47,7 @@ class IpPacketMonitor:
   def __init__(self, host_ip: IpAddress):
     self._host_ip = host_ip
 
-  def monitor(self) -> Generator[IpPacket]:
+  def monitor(self) -> Generator[IpPacket, None, None]:
     """Generator for observations of remote IP addresses.
 
     The monitor is a blocking operation due to how process output is produced.

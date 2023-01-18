@@ -32,8 +32,9 @@ from absl import app
 from absl import flags
 
 from rids import iocs
-from rids.monitors.tls_monitor import TlsConnectionMonitor
 from rids.monitors.ip_monitor import IpPacketMonitor
+from rids.monitors.tls_monitor import TlsConnectionMonitor
+from rids.rules.ruleset import RuleSet
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('host_ip', None,

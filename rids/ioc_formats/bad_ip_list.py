@@ -22,6 +22,7 @@ import urllib.request
 from rids.iocs import RuleSet
 from rids.rules.ip_matcher import IpRule
 from rids.rules.ip_matcher import IpMatcher
+from rids.rules.ruleset import RuleSet
 
 
 class BadIpAddresses:
@@ -32,10 +33,9 @@ class BadIpAddresses:
     self.source_name = config.get('name', 'UNKNOWN')
     self.msg = config.get('msg', 'contact with a potentially compromised host')
 
-  def provide_rules(self, ip_matcher: IpMatcher):
+  def provide_rules(self, ruleset: RuleSet):
     """Add to the ruleset all the rules defined in this source."""
     fetch_time = datetime.now()
-
     with urllib.request.urlopen(self.source_url) as ioc_data:
       for line in ioc_data.readlines():
         line = line.decode('utf-8').strip()
@@ -55,4 +55,4 @@ class BadIpAddresses:
             fetched=fetch_time,
             matches_ip=bad_ip,
         )
-        ip_matcher.add_ip_rule(ip_rule)
+        ruleset.ip_matcher.add_ip_rule(ip_rule)

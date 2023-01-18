@@ -31,32 +31,12 @@ from rids.monitors import tshark
 # union type for IPv4 and IPv6
 IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 
+
 @dataclass
 class IpPacket:
   """Represents a remote IP endpoint and when it was seen."""
   timestamp: str  # TODO: if calculating duration with this, make it a datetime
   ip_address: IpAddress
-
-@dataclass
-class IpRule:
-  """Represents a single rule that accommodates a variety of IOC rule types."""
-
-  msg: str
-  name: str
-  url: str 
-  fetched: datetime.datetime
-  matches_ip: IpAddress
-  reference: str = None
-
-  def __str__(self):
-    output = [
-        f'[{self.matches_ip}] {self.msg}',
-        f'Found in [{self.name}] last fetched at {self.fetched}',
-    ]
-    
-    if self.reference:
-      output.append(self.reference)
-    return '\n'.join(output)  
 
 
 class IpPacketMonitor:
@@ -65,6 +45,7 @@ class IpPacketMonitor:
   The monitor() function is an iterator that produces a dict{...} representing
   the endpoints (specifically the `remote_ip` field and the packet's timestamp).
   """
+
   def __init__(self, host_ip: IpAddress):
     self._host_ip = host_ip
 

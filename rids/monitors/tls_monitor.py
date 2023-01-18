@@ -21,13 +21,13 @@ from types import Union
 from rids.monitors import tshark
 
 
-# union type for IPv4 and IPv6
+# union type for IPv4 and IPv6 addresses
 IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 
 @dataclass
 class TlsConnection:
   """Represents salient properties of a TLS connection and when it was seen."""
-  timestamp: str
+  timestamp: str  # TODO: use a real datetime type if doing calculations with it
   remote_ip: IpAddress
   remote_port: int
   server_name: str
@@ -35,11 +35,6 @@ class TlsConnection:
   ja3_full: str
   ja3s: str
   ja3s_full: str
-
-@dataclass
-class TlsRule:
-  allowed_sni: str
-  expected_port: int
 
 
 class TlsConnectionMonitor:

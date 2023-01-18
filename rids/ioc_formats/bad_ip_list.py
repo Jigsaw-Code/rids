@@ -19,18 +19,20 @@ from datetime import datetime
 import ipaddress
 import urllib.request
 
-from rids.iocs.iocs import RuleSet
-from rids.monitors.ip_monitor import IpRule
+from rids.iocs import RuleSet
+from rids.rules.ip_matcher import IpRule
+from rids.rules.ip_matcher import IpMatcher
 
 
 class BadIpAddresses:
   """Parses newline-separated list of IP addresses into a RuleSet."""
+
   def __init__(self, config):
     self.source_url = config['url']
     self.source_name = config.get('name', 'UNKNOWN')
     self.msg = config.get('msg', 'contact with a potentially compromised host')
 
-  def provide_rules(self, ruleset: RuleSet):
+  def provide_rules(self, ip_matcher: IpMatcher):
     """Add to the ruleset all the rules defined in this source."""
     fetch_time = datetime.now()
 
@@ -53,4 +55,4 @@ class BadIpAddresses:
             fetched=fetch_time,
             matches_ip=bad_ip,
         )
-        ruleset.add_ip_rule(ip_rule)
+        ip_matcher.add_ip_rule(ip_rule)

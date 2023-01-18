@@ -19,20 +19,19 @@ Main entry point for RIDS, a Remote Intrusion Detection System.
 """
 
 import asyncio
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 import ipaddress
 import json
 import logging
 import os
-import threading
 import urllib
 import queue
 
 from absl import app
 from absl import flags
 
-from rids.iocs import iocs
+from rids import iocs
 from rids.monitors.tls_monitor import TlsConnectionMonitor
 from rids.monitors.ip_monitor import IpPacketMonitor
 
@@ -59,14 +58,14 @@ def main(argv):
                       filemode='a')
 
   config = _load_config()
-  ruleset = iocs.fetch_iocs(config)
+  ruleset : RuleSet = iocs.fetch_iocs(config)
 
   host_ip = _get_host_ip()
   print(f'Using {host_ip} as host IP address')
 
   event_queue = queue.Queue()
   loop = asyncio.get_event_loop()
-  with ProcessPoolExecutor(max_workers=3) as executor:
+  with ThreadPoolExecutor() as executor:
     loop.run_in_executor(
         executor,
         partial(_inspect_tls_traffic, host_ip, ruleset, event_queue))
@@ -78,7 +77,7 @@ def main(argv):
       # We just log the suspicious events for now, but here is where we could
       # do post-processing and/or share sightings of known / unknown threats.
       event = event_queue.get()
-      logging.log(json.puts(event))
+      logging.log(json.dumps(event))
       event_queue.task_done()
 
 
@@ -91,7 +90,7 @@ def _inspect_tls_traffic(host_ip, ruleset, q):
   """
   tls_connection = TlsConnectionMonitor(host_ip)
   for tls_info in tls_connection.monitor():
-    events = ruleset.match_tls(tls_info)
+    events = ruleset.tls_matcher.match_tls(tls_info)
     for event in events:
       q.put(event)
 
@@ -105,7 +104,7 @@ def _inspect_remote_endpoints(host_ip, ruleset, q):
   """
   remote_ip = IpPacketMonitor(host_ip)
   for ip_info in remote_ip.monitor():
-    events = ruleset.match_ip(ip_info)
+    events = ruleset.ip_matcher.match_ip(ip_info)
     for event in events:
       q.put(event)
 

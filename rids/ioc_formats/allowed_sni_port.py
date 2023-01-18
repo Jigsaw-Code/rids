@@ -15,8 +15,8 @@
 """IOC parser for allowing certain unusual (server name, port) sightings."""
 
 
-from rids.iocs.iocs import RuleSet
-from rids.monitors.tls_monitor import TlsRule
+from rids.iocs import RuleSet
+from rids.rules.tls_matcher import TlsMatcher
 
 
 class AllowedEndpoints:
@@ -25,9 +25,7 @@ class AllowedEndpoints:
     self.name = config['name']
     self.allowlist = config['allow']
 
-  def provide_rules(self, ruleset: RuleSet):
-    for sni, port in self.allowlist:
-      tls_rule = TlsRule(
-          allowed_sni=sni,
-          expected_port=port)
-      ruleset.add_tls_rule(tls_rule)
+  def provide_rules(self, tls_matcher: TlsMatcher):
+    """Add rules to the TlsMatcher according to the configured allowlist."""
+    for server_name, port in self.allowlist:
+      tls_matcher.add_allowed_sni(server_name, port)

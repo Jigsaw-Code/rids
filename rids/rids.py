@@ -14,113 +14,145 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 """
 Main entry point for RIDS, a Remote Intrusion Detection System.
 """
 
-
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 import ipaddress
 import json
+import logging
 import os
-import subprocess
-import sys
-import urllib.request
+import urllib
+import queue
+from typing import Union
 
 from absl import app
 from absl import flags
 
-from rids import network_capture
+from rids import iocs
+from rids.monitors.ip_monitor import IpPacketMonitor
+from rids.monitors.tls_monitor import TlsConnectionMonitor
+from rids.rules.ruleset import RuleSet
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('host_ip', None,
-                    'The IP of the host process, for ignoring direct requests')
-flags.DEFINE_string('config_path', 'config.json',
-                    'Path where IOC configuration can be found; uses config.json by default')
-
-
-def retrieve_bad_ips():
-  bad_ips = {}
-  with open(FLAGS.config_path, 'r') as f:
-    config = json.load(f)
-    for source in config['ioc_sources']:
-      # Download a fresh version of each IOC source in the config.
-      with urllib.request.urlopen(source['url']) as ioc_data:
-        # TODO check format of ioc source, branch to different parsers
-        # For now, the only source format is newline-seprated bad IPv4 addresses
-        # TODO perform parsing in a separate function from config handling
-        for line in ioc_data.readlines():
-          line = line.strip().decode('utf-8')
-          if not line: continue
-          bad_ip = str(ipaddress.ip_address(line))
-          if bad_ip not in bad_ips:
-            bad_ips[bad_ip] = [source['name']]
-          else:
-            bad_ips[bad_ip].append(source['name'])
-  return bad_ips
-
-
-def get_external_ip():
-  with urllib.request.urlopen('https://ipinfo.io/ip') as my_ip:
-    return my_ip.read().decode("utf-8").strip()
+                    'The IP of the host process, helps determine whether an IP '
+                    'is a client or a remote endpoint.')
+flags.DEFINE_string('config_path', '/etc/rids/config.json',
+                    'file path indicating where IOC configuration can be found')
+flags.DEFINE_string('eventlog_path', None,
+                    'file path indicating where to append new event logs')
 
 
 def main(argv):
+  """Main entry point of the app.  Also bound to CLI `rids` by setuptools."""
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
 
+  eventlog_path = _get_eventlog_path()
+  logging.basicConfig(level=logging.DEBUG,
+                      format='%(asctime)s %(levelname)-8s %(message)s',
+                      datefmt='%m-%d %H:%M',
+                      filename=eventlog_path,
+                      filemode='a')
+
+  config = _load_config()
+  ruleset : RuleSet = iocs.fetch_iocs(config)
+
+  host_ip = _get_host_ip()
+  print(f'Using {host_ip} as host IP address')
+
+  event_queue = queue.Queue()
+  loop = asyncio.get_event_loop()
+  with ThreadPoolExecutor() as executor:
+    loop.run_in_executor(
+        executor,
+        partial(_inspect_tls_traffic, host_ip, ruleset, event_queue))
+    loop.run_in_executor(
+        executor,
+        partial(_inspect_remote_ips, host_ip, ruleset, event_queue))
+  
+    while True:
+      # We just log the suspicious events for now, but here is where we could
+      # do post-processing and/or share sightings of known / unknown threats.
+      event = event_queue.get()
+      logging.log(json.dumps(event))
+      event_queue.task_done()
+
+
+IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+
+def _inspect_tls_traffic(host_ip: IpAddress, ruleset: RuleSet, q: queue.Queue):
+  """Worker function for thread that inspects client and server hellos.
+  
+  Args:
+    host_ip: the IP address associated with this server, for determining
+        client hellos and server hellos not interfacing directly with this host
+    ruleset: a RuleSet object to perform evaluation with
+    q: a queue.Queue for relaying events back to the main thread
+  """
+  tls_connection = TlsConnectionMonitor(host_ip)
+  for tls_info in tls_connection.monitor():
+    events = ruleset.tls_matcher.match_tls(tls_info)
+    for event in events:
+      q.put(event)
+
+
+def _inspect_remote_ips(host_ip: IpAddress, ruleset: RuleSet, q: queue.Queue):
+  """Worker function for thread that inspects remote IP addresses.
+
+  Args:
+    host_ip: the IP address associated with this server, for determining
+        which IP addresses are considered remote IPs
+    ruleset: a RuleSet object to perform evaluation with
+    q: a queue.Queue for relaying events back to the main thread
+  """
+  remote_ip = IpPacketMonitor(host_ip)
+  for ip_info in remote_ip.monitor():
+    events = ruleset.ip_matcher.match_ip(ip_info)
+    for event in events:
+      q.put(event)
+
+
+def _get_host_ip() -> IpAddress:
+  """Retrieves the host IP address from its flag, else from a remote site.
+  
+  Returns:
+    ipaddress of the host running RIDS
+  """
   host_ip = FLAGS.host_ip
   if not FLAGS.host_ip:
-    host_ip = get_external_ip()
+    with urllib.request.urlopen('https://ipinfo.io/ip') as my_ip:
+      host_ip = my_ip.read().decode("utf-8").strip()
   host_ip = ipaddress.ip_address(host_ip)
-  print('Using', host_ip, 'as host IP address')
+  return host_ip
 
-  # Spawn tshark and read its output.  This assumes the wireshark-dev/stable
-  # version of tshark has been installed.
-  oddtls_capture = subprocess.Popen([
-      'tshark',
-      '-f', 'tcp and not (src port 443 or dst port 443)',
-      '-Y', (f'(tls.handshake.type == 1 and ip.src == {host_ip})' +
-             f'or (tls.handshake.type == 2 and ip.dst == {host_ip})'),
-      '-Tfields',
-      # The order of the following fields determines the ordering in output
-      '-e', 'frame.time',
-      '-e', 'tcp.stream',
-      '-e', 'tls.handshake.type',
-      '-e', 'ip.src',
-      '-e', 'tcp.srcport',
-      '-e', 'ip.dst',
-      '-e', 'tcp.dstport',
-      '-e', 'tls.handshake.extensions_server_name',
-      '-e', 'tls.handshake.ja3',
-      '-e', 'tls.handshake.ja3_full',
-      '-e', 'tls.handshake.ja3s',
-      '-e', 'tls.handshake.ja3s_full',
-      '-l',
-      ],
-      stdout=subprocess.PIPE,
-      stderr=subprocess.PIPE,
-      universal_newlines=True)
-  network_capture.detect_tls_events(oddtls_capture.stdout.readline)
 
-  bad_ips = retrieve_bad_ips()
-  ip_capture = subprocess.Popen([
-      'tshark',
-      '-Tfields',
-      # The order of the following fields determines the ordering in output
-      '-e', 'frame.time',
-      '-e', 'ip.src',
-      '-e', 'ip.dst',
-      '-l',
-      ],
-      stdout=subprocess.PIPE,
-      stderr=subprocess.PIPE,
-      universal_newlines=True)
+def _load_config() -> dict:
+  """Read and parse the config file contents.
+  
+  Returns:
+    dict of config contents
+  """
+  config = {}
+  if FLAGS.config_path:
+    with open(FLAGS.config_path) as f:
+      config = json.load(f)
+  return config
 
-  # TODO define a class in packet_filter instead of using a function
-  # filter = network_capture.Filter(); filter.add_bad_ips(bad_ips); ...
-  for line in iter(ip_capture.stdout.readline, b''):
-    network_capture.detect_bad_ips(line, bad_ips)
+
+def _get_eventlog_path() -> str:
+  """Determine where to save the event logs.
+  
+  If not specified in the flag, use the current working directory.
+  """
+  path = FLAGS.eventlog_path
+  if not path:
+    path = os.getcwd()
+  return path
 
 
 if __name__ == '__main__':

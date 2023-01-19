@@ -16,31 +16,20 @@
 
 # Install script for RIDS, the Remote Intrusion Detection System.
 
-# install script
-add-apt-repository --assume-yes ppa:wireshark-dev/stable
+# use the dev/stable version of tshark to get ja3/ja3s signatures
+add-apt-repository ppa:wireshark-dev/stable
 apt --assume-yes update
+
+# install system dependencies
 apt --assume-yes install tshark python3-pip
 
-# download repo with scripts
-git clone https://github.com/Jigsaw-Code/rids
-pushd rids
+# install RIDS from repo, including its python dependencies
+pip3 install git+git://github.com/Jigsaw-Code/rids.git@main
 
-pip3 install absl-py
-
-# copy wrapper script into a bin/ path
-cp detect.sh /usr/local/sbin
-chmod +x /usr/local/sbin/detect.sh
-cp rids/network_capture.py /usr/local/sbin
-cp rids/rids.py /usr/local/sbin
-
-# Define sysctl .service config to /etc/systemd and start service
-
-# first, stop the service if it exists and is running
+# this may be an upgrade, stop the service if it exists and is running
 systemctl stop rids.service >& /dev/null
 
+# Define sysctl .service config for /etc/systemd and start service
 cp rids.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable rids.service --now
-
-# return to previous directory
-popd

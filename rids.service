@@ -2,9 +2,9 @@
 Description=Remote Intrusion Detection System daemon
 
 [Service]
-User=root
+User=rids
 WorkingDirectory=/usr/local/sbin
-ExecStart="/usr/local/sbin/rids.py --eventlog_path=/var/rids/events.log --config_path=/etc/rids/config.json"
+ExecStart="python3 -m rids --eventlog_path=/var/rids/events.log --config_path=/etc/rids/config.json"
 Restart=always
 
 [Install]

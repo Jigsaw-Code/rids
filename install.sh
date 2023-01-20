@@ -23,13 +23,46 @@ apt --assume-yes update
 # install system dependencies
 apt --assume-yes install tshark python3-pip
 
-# install RIDS from repo, including its python dependencies
-pip3 install git+git://github.com/Jigsaw-Code/rids.git@main
+
+# PIP doesn't like installing as root; check user and switch if needed
+if [[ $EUID -eq 0 ]]; then
+  RIDS_USER="${RIDS_USER:-rids}"
+
+  echo "PIP will not install as root; run as ${RIDS_USER}? (y/n) "
+  read ANSWER
+  ANSWER=$(echo "${ANSWER}" | tr '[:upper:]' '[:lower:]')
+  if [[ $ANSWER == "y" ]]; then
+    # check for existing user
+    if [[ $(id "${RIDS_USER}" >/dev/null; echo $?) -ne 0 ]]; then
+      echo "There is no user called ${RIDS_USER}; create one? (y/n)"
+      read ANSWER
+      ANSWER=$(echo "${ANSWER}" | tr '[:upper:]' '[:lower:]')
+      if [[ $ANSWER == "y" ]]; then
+        sudo useradd -s /bin/bash -m -G adm,sudo,dip,plugdev,www-data $RIDS_USER
+        # system should prompt user for password, otherwise add `chpasswd` call here
+        SUDO_COMMAND="sudo -u ${RIDS_USER}"
+      else
+        echo "cannot install RIDS as root; aborting."
+        exit 1
+      fi
+    fi
+
+    # install RIDS from repo, including its python dependencies
+    ${SUDO_COMMAND} pip3 install --upgrade git+https://github.com/Jigsaw-Code/rids.git@main
+
+  else
+    echo "cannot install RIDS as root; specify RIDS_USER env-var for the user to install as."
+    echo "aborting."
+    exit 1
+  fi
+fi
+
+RIDS_INSTALL_PATH="$(python3 -m pip show rids | grep Location | cut -d" " -f 2)"
 
 # this may be an upgrade, stop the service if it exists and is running
 systemctl stop rids.service >& /dev/null
 
 # Define sysctl .service config for /etc/systemd and start service
-cp rids.service /etc/systemd/system/
+cp "${RIDS_INSTALL_PATH}/rids.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable rids.service --now

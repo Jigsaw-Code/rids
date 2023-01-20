@@ -17,7 +17,7 @@
 
 import collections
 from dataclasses import dataclass
-from types import Set
+from typing import Set
 
 from rids.ioc_formats import allowed_sni_port
 from rids.ioc_formats import bad_ip_list

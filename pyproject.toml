@@ -1,6 +1,6 @@
 [project]
 name = "rids"
-version = "0.1.0"
+version = "0.2.0"
 description = "Remote Intrusion Detection System"
 readme = "README.md"
 requires-python = ">=3.7"
@@ -20,8 +20,11 @@ dependencies = [
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tools.setuptools]
+[tool.setuptools]
 packages = ["rids"]
+
+[tool.setuptools.package-data]
+"*" = ["*.service", "*.json"]
 
 [project.scripts]
 rids = "rids.rids:main"
